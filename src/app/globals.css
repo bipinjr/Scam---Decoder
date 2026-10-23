@@ -427,3 +427,14 @@ body::after {
   @keyframes fb-spin { to { transform: rotate(360deg); } }
   @keyframes fb-bob { 50% { transform: translateY(-5px); } }
 }
+
+/* Feedback: floating tap-to-add suggestions */
+.fb-sugg { border-color: rgb(255 255 255 / .14); background: rgb(255 255 255 / .04); color: var(--color-ink);
+  transition: transform .25s cubic-bezier(.3, 1.6, .5, 1), background .25s ease, border-color .25s ease, color .25s ease, box-shadow .25s ease; }
+.fb-sugg:hover { transform: translateY(-3px) scale(1.04); border-color: rgb(255 75 62 / .6); background: rgb(255 75 62 / .1); box-shadow: 0 10px 26px -12px rgb(255 75 62 / .8); }
+.fb-sugg-on { border-color: var(--color-green); background: rgb(43 212 138 / .14); color: #b8f5d8; }
+@media (prefers-reduced-motion: no-preference) {
+  .fb-sugg { animation: pop .45s cubic-bezier(.3, 1.8, .5, 1) both, fb-drift 4.5s ease-in-out infinite; animation-delay: calc(var(--i, 0) * .05s + .2s), calc(var(--i, 0) * -.7s); }
+  .fb-sugg:hover, .fb-sugg-on { animation-play-state: paused; }
+  @keyframes fb-drift { 0%, 100% { translate: 0 0; } 50% { translate: 0 -5px; } }
+}

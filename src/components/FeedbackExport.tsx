@@ -11,14 +11,15 @@ const FAV: Record<string, string> = {
   message: "Message check", voice: "Call / voice check", screenshot: "Screenshot check",
   radar: "Scam Radar", practice: "Practice mode", languages: "Indian languages",
 };
-const REC: Record<string, string> = { yes: "Yes", maybe: "Maybe", no: "No" };
+const REC: Record<string, string> = { yes: "Sending it today", maybe: "Maybe later", no: "Nah" };
+const REACT = ["Panic and share it", "Call the number", "Ask someone first", "Just ignore it", "Spot it and report it"];
 const TITLE = "Feedback on Scam Decoder · Tech Anveshanam Tech Expo Event";
 const MARK = "SCAM DECODER · TECH ANVESHANAM · CONFIDENTIAL";
-const HEAD = ["#", "Submitted (IST)", "Name", "Stream", "Class", "Section", "Phone", "Ease (1-5)", "Clarity (1-5)", "Favourite feature", "Recommend", "Confidence (1-5)", "Doubts / suggestions"];
+const HEAD = ["#", "Submitted (IST)", "Name", "Stream", "Class", "Section", "Phone", "Grandma test (1-5)", "Can explain why (1-5)", "Would show family first", "Share in family group", "Scam reflex (1-5)", "Reaction to OTP scam", "Doubts / suggestions"];
 
 const ist = (iso: string) => new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
 const stamp = () => new Date().toISOString().slice(0, 10);
-const cells = (r: Row, i: number) => [i + 1, ist(r.created_at), r.name, r.stream, r.class, r.section, r.phone, r.ease, r.clarity, FAV[r.favourite] ?? r.favourite, REC[r.recommend] ?? r.recommend, r.confidence, r.doubts ?? ""];
+const cells = (r: Row, i: number) => [i + 1, ist(r.created_at), r.name, r.stream, r.class, r.section, r.phone, r.ease, r.clarity, FAV[r.favourite] ?? r.favourite, REC[r.recommend] ?? r.recommend, r.confidence, REACT[r.confidence - 1] ?? "", r.doubts ?? ""];
 const plural = (n: number) => `${n} response${n === 1 ? "" : "s"}`;
 const avg = (rows: Row[], k: "ease" | "clarity" | "confidence") => (rows.reduce((s, r) => s + r[k], 0) / rows.length).toFixed(2);
 
@@ -67,7 +68,7 @@ async function toExcel(rows: Row[]) {
     row.alignment = { vertical: "top", wrapText: true };
     if (i % 2) row.eachCell((c) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "0FFF4B3E" } }; });
   });
-  [5, 20, 22, 14, 12, 9, 14, 10, 11, 20, 11, 13, 48].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+  [5, 20, 22, 14, 12, 9, 14, 12, 13, 22, 17, 11, 22, 48].forEach((w, i) => (ws.getColumn(i + 1).width = w));
   ws.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: HEAD.length } };
 
   const sum = wb.addWorksheet("Summary");
@@ -77,15 +78,18 @@ async function toExcel(rows: Row[]) {
   sum.addRow([]);
   const stats: (string | number)[][] = [
     ["Total responses", rows.length],
-    ["Average ease (1-5)", rows.length ? Number(avg(rows, "ease")) : 0],
-    ["Average clarity (1-5)", rows.length ? Number(avg(rows, "clarity")) : 0],
-    ["Average confidence (1-5)", rows.length ? Number(avg(rows, "confidence")) : 0],
+    ["Average grandma test (1-5)", rows.length ? Number(avg(rows, "ease")) : 0],
+    ["Average can-explain-why (1-5)", rows.length ? Number(avg(rows, "clarity")) : 0],
+    ["Average scam reflex (1-5)", rows.length ? Number(avg(rows, "confidence")) : 0],
     [],
-    ["Would recommend", "Responses"],
+    ["Share in family group", "Responses"],
     ...Object.entries(REC).map(([k, v]) => [v, rows.filter((r) => r.recommend === k).length]),
     [],
-    ["Favourite feature", "Responses"],
+    ["Would show family first", "Responses"],
     ...Object.entries(FAV).map(([k, v]) => [v, rows.filter((r) => r.favourite === k).length]),
+    [],
+    ["Reaction to OTP scam", "Responses"],
+    ...REACT.map((v, i) => [v, rows.filter((r) => r.confidence === i + 1).length]),
   ];
   stats.forEach((s) => { const row = sum.addRow(s); if (s[1] === "Responses") row.font = { bold: true }; });
   sum.getColumn(1).width = 30; sum.getColumn(2).width = 14;
@@ -104,7 +108,7 @@ async function toPdf(rows: Row[]) {
   doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90, 98, 115);
   doc.text(`Tech Anveshanam Tech Expo Event  ·  ${plural(rows.length)}  ·  exported ${ist(new Date().toISOString())}`, 40, 64);
   if (rows.length)
-    doc.text(`Average ease ${avg(rows, "ease")}/5  ·  clarity ${avg(rows, "clarity")}/5  ·  confidence ${avg(rows, "confidence")}/5  ·  would recommend: ${rows.filter((r) => r.recommend === "yes").length} of ${rows.length}`, 40, 79);
+    doc.text(`Grandma test ${avg(rows, "ease")}/5  ·  can explain why ${avg(rows, "clarity")}/5  ·  scam reflex ${avg(rows, "confidence")}/5  ·  sharing today: ${rows.filter((r) => r.recommend === "yes").length} of ${rows.length}`, 40, 79);
 
   autoTable(doc, {
     startY: 92,
@@ -113,7 +117,7 @@ async function toPdf(rows: Row[]) {
     styles: { fontSize: 7.5, cellPadding: 4, overflow: "linebreak", valign: "top" },
     headStyles: { fillColor: [217, 50, 38], textColor: 255, fontStyle: "bold" },
     alternateRowStyles: { fillColor: [255, 244, 243] },
-    columnStyles: { 0: { cellWidth: 20 }, 12: { cellWidth: 170 } },
+    columnStyles: { 0: { cellWidth: 20 }, 13: { cellWidth: 150 } },
     margin: { top: 40, left: 30, right: 30, bottom: 40 },
     didDrawPage: () => {
       const d = doc as unknown as { GState: new (o: { opacity: number }) => unknown; setGState: (g: unknown) => void };

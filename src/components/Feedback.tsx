@@ -11,14 +11,20 @@ type Form = {
 const EMPTY: Form = { name: "", stream: "", class: "", section: "", phone: "", ease: 0, clarity: 0, favourite: "", recommend: "", confidence: 0, doubts: "" };
 
 const STEPS = ["About you", "Your experience", "Any doubts?"];
-const EASE = [["😣", "Very hard"], ["😕", "Hard"], ["😐", "Okay"], ["🙂", "Easy"], ["🤩", "Very easy"]];
-const CLARITY = ["Not clear", "A little", "Mostly", "Clear", "Crystal clear"];
+const EASE = [["😵", "She'd give up"], ["😟", "Needs a lot of help"], ["😐", "Needs a little help"], ["🙂", "She'd manage"], ["🤩", "She'd teach others"]];
+const CLARITY = ["No idea", "Kind of", "Roughly", "Yes, clearly", "Like a pro"];
 const FAVOURITES = [
   ["message", "💬", "Message check"], ["voice", "📞", "Call / voice check"], ["screenshot", "🖼️", "Screenshot check"],
   ["radar", "📡", "Scam Radar"], ["practice", "🎯", "Practice mode"], ["languages", "🌐", "Indian languages"],
 ];
-const RECOMMEND = [["yes", "👍", "Yes, definitely"], ["maybe", "🤔", "Maybe"], ["no", "👎", "Not really"]];
-const CONFIDENCE = ["Not at all", "A little", "Somewhat", "Confident", "Very confident"];
+const RECOMMEND = [["yes", "📲", "Sending it today"], ["maybe", "🤔", "Maybe later"], ["no", "🙅", "Nah"]];
+const CONFIDENCE = ["Panic and share it", "Call the number", "Ask someone first", "Just ignore it", "Spot it and report it"];
+const SUGGESTIONS = [
+  "How does it know a link is fake?", "Does it save my messages?", "Will there be an Android app?",
+  "Can it check WhatsApp voice notes?", "What if the AI gets it wrong?", "Add more Indian languages",
+  "Make a browser extension", "Can my parents use it easily?", "How do I report to cyber police?",
+  "Does it work without internet?", "Loved the red-pen markup!", "Add a scam quiz for students",
+];
 
 const phoneOk = (p: string) => /^[6-9]\d{9}$/.test(p.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""));
 
@@ -136,7 +142,7 @@ export function Feedback() {
 
                 {step === 1 && (
                   <div className="space-y-6">
-                    <Question n={1} title="How easy was Scam Decoder to use?" error={err("ease")}>
+                    <Question n={1} title="If your grandma tried Scam Decoder on her own, how would it go?" error={err("ease")}>
                       <div className="grid grid-cols-5 gap-2">
                         {EASE.map(([emoji, label], i) => (
                           <Option key={label} name="ease" checked={f.ease === i + 1} onChange={() => set("ease", i + 1)} className="fb-emoji flex-col py-3">
@@ -147,7 +153,7 @@ export function Feedback() {
                       </div>
                     </Question>
 
-                    <Question n={2} title="How clearly did it explain why a message was a scam?" error={err("clarity")}>
+                    <Question n={2} title="Could you now explain to a friend WHY that message was a scam?" error={err("clarity")}>
                       <div className="grid grid-cols-5 gap-2">
                         {CLARITY.map((label, i) => (
                           <Option key={label} name="clarity" checked={f.clarity === i + 1} onChange={() => set("clarity", i + 1)} className="flex-col py-3">
@@ -158,7 +164,7 @@ export function Feedback() {
                       </div>
                     </Question>
 
-                    <Question n={3} title="Which feature did you like the most?" error={err("favourite")}>
+                    <Question n={3} title="Which feature would you show your family first?" error={err("favourite")}>
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                         {FAVOURITES.map(([id, icon, label]) => (
                           <Option key={id} name="favourite" checked={f.favourite === id} onChange={() => set("favourite", id)} className="justify-start gap-2 px-3 py-3 text-left">
@@ -168,7 +174,7 @@ export function Feedback() {
                       </div>
                     </Question>
 
-                    <Question n={4} title="Would you recommend Scam Decoder to your family and friends?" error={err("recommend")}>
+                    <Question n={4} title="Would you drop Scam Decoder in your family WhatsApp group?" error={err("recommend")}>
                       <div className="grid grid-cols-3 gap-2">
                         {RECOMMEND.map(([id, icon, label]) => (
                           <Option key={id} name="recommend" checked={f.recommend === id} onChange={() => set("recommend", id)} className="fb-emoji flex-col py-4">
@@ -178,11 +184,11 @@ export function Feedback() {
                       </div>
                     </Question>
 
-                    <Question n={5} title="After using it, how confident do you feel spotting a scam on your own?" error={err("confidence")}>
-                      <div className="flex h-36 items-end gap-2" role="presentation">
+                    <Question n={5} title="Tomorrow you get: “Your bank account will be blocked today. Share the OTP to stop it.” What do you do?" error={err("confidence")}>
+                      <div className="flex h-44 items-end gap-2" role="presentation">
                         {CONFIDENCE.map((label, i) => (
                           <Option key={label} name="confidence" checked={f.confidence === i + 1} onChange={() => set("confidence", i + 1)}
-                            className={`fb-meter flex-1 flex-col justify-end pb-2 ${f.confidence > i ? "fb-meter-on" : ""}`} style={{ height: `${36 + i * 16}%`, "--i": i } as CSSProperties}>
+                            className={`fb-meter flex-1 flex-col justify-end pb-2 ${f.confidence === i + 1 ? "fb-meter-on" : ""}`} style={{ height: `${36 + i * 16}%`, "--i": i } as CSSProperties}>
                             <span className="text-[0.65rem] font-semibold leading-tight sm:text-xs">{label}</span>
                           </Option>
                         ))}
@@ -197,15 +203,30 @@ export function Feedback() {
                       <textarea value={f.doubts} onChange={(e) => set("doubts", e.target.value)} maxLength={1000} rows={5} placeholder="Ask us anything about Scam Decoder, or tell us what to improve…" />
                     </Field>
                     <p className="-mt-4 text-right text-xs text-ink-soft tabular-nums">{f.doubts.length} / 1000</p>
+                    <div>
+                      <p className="text-sm font-semibold text-white">💡 Tap to add, no typing needed</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {SUGGESTIONS.map((sg, i) => {
+                          const used = f.doubts.includes(sg);
+                          return (
+                            <button key={sg} type="button" aria-pressed={used}
+                              onClick={() => set("doubts", used ? f.doubts.replace(sg, "").replace(/\n{2,}/g, "\n").trim() : (f.doubts.trim() ? f.doubts.trim() + "\n" : "") + sg)}
+                              className={`fb-sugg rounded-full border px-3.5 py-2 text-sm ${used ? "fb-sugg-on" : ""}`} style={{ "--i": i } as CSSProperties}>
+                              {used ? "✓ " : "+ "}{sg}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                     <div className="fb-summary rounded-2xl border hairline bg-white/[0.03] p-5">
                       <p className="text-sm font-semibold text-white">Quick review</p>
                       <ul className="mt-3 flex flex-wrap gap-2 text-sm">
                         {[
                           f.name, `${f.stream} · ${f.class} · ${f.section}`,
-                          `Ease ${EASE[f.ease - 1]?.[0] ?? ""}`, `Clarity ${f.clarity}/5`,
-                          `Loved: ${FAVOURITES.find((x) => x[0] === f.favourite)?.[2] ?? ""}`,
-                          `Recommend: ${RECOMMEND.find((x) => x[0] === f.recommend)?.[2] ?? ""}`,
-                          `Confidence ${f.confidence}/5`,
+                          `Grandma test ${EASE[f.ease - 1]?.[0] ?? ""}`, `Can explain: ${CLARITY[f.clarity - 1] ?? ""}`,
+                          `Show first: ${FAVOURITES.find((x) => x[0] === f.favourite)?.[2] ?? ""}`,
+                          `Family group: ${RECOMMEND.find((x) => x[0] === f.recommend)?.[2] ?? ""}`,
+                          `You would: ${CONFIDENCE[f.confidence - 1] ?? ""}`,
                         ].map((s, i) => <li key={i} className="fb-tag rounded-full border border-white/12 bg-white/[0.05] px-3 py-1 text-ink" style={{ "--i": i } as CSSProperties}>{s}</li>)}
                       </ul>
                     </div>
