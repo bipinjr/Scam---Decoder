@@ -26,6 +26,7 @@ const SUGGESTIONS = [
   "Does it work without internet?", "Loved the red-pen markup!", "Add a scam quiz for students",
 ];
 
+const isFaculty = (f: Form) => /faculty/i.test(f.class) || /faculty/i.test(f.stream);
 const phoneOk = (p: string) => /^[6-9]\d{9}$/.test(p.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""));
 
 function stepErrors(f: Form, step: number) {
@@ -34,7 +35,7 @@ function stepErrors(f: Form, step: number) {
     if (f.name.trim().length < 2) e.push("name");
     if (!f.stream.trim()) e.push("stream");
     if (!f.class.trim()) e.push("class");
-    if (!f.section.trim()) e.push("section");
+    if (!f.section.trim() && !isFaculty(f)) e.push("section");
     if (!phoneOk(f.phone)) e.push("phone");
   }
   if (step === 1) (["ease", "clarity", "favourite", "recommend", "confidence"] as const).forEach((k) => !f[k] && e.push(k));
@@ -62,7 +63,7 @@ export function Feedback() {
   async function submit() {
     setState("sending");
     try {
-      const r = await fetch("/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(f) });
+      const r = await fetch("/api/feedback", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...f, section: f.section.trim() || (isFaculty(f) ? "-" : "") }) });
       setState(r.ok ? "done" : "error");
     } catch { setState("error"); }
   }
@@ -122,14 +123,14 @@ export function Feedback() {
                       <input value={f.name} onChange={(e) => set("name", e.target.value)} maxLength={80} autoComplete="name" placeholder="e.g. Ananya Rao" />
                     </Field>
                     <Field label="Stream" error={err("stream") && "Please enter your stream."} i={1}>
-                      <input value={f.stream} onChange={(e) => set("stream", e.target.value)} maxLength={60} list="fb-streams" placeholder="e.g. Science (PCMB)" />
-                      <datalist id="fb-streams">{["Science (PCMB)", "Science (PCMC)", "Science (PCME)", "Commerce", "Arts"].map((s) => <option key={s} value={s} />)}</datalist>
+                      <input value={f.stream} onChange={(e) => set("stream", e.target.value)} maxLength={60} list="fb-streams" placeholder="e.g. Science (PCMC)" />
+                      <datalist id="fb-streams">{["Science (PCMB)", "Science (PCMC)", "Science (PCME)", "Science (PCMS)", "Science (PCM)", "Commerce (CEBA)", "Commerce (CSBA)", "Commerce (SEBA)", "Commerce (HEBA)", "Commerce (BEBA)", "Commerce (MEBA)", "Faculty"].map((s) => <option key={s} value={s} />)}</datalist>
                     </Field>
                     <Field label="Class" error={err("class") && "Please enter your class."} i={2}>
-                      <input value={f.class} onChange={(e) => set("class", e.target.value)} maxLength={30} list="fb-classes" placeholder="e.g. 1st PUC" />
-                      <datalist id="fb-classes">{["1st PUC", "2nd PUC"].map((s) => <option key={s} value={s} />)}</datalist>
+                      <input value={f.class} onChange={(e) => set("class", e.target.value)} maxLength={30} list="fb-classes" placeholder="e.g. 2nd PUC" />
+                      <datalist id="fb-classes">{["2nd PUC", "Faculty"].map((s) => <option key={s} value={s} />)}</datalist>
                     </Field>
-                    <Field label="Section" error={err("section") && "Please enter your section."} i={3}>
+                    <Field label={isFaculty(f) ? "Section (optional for faculty)" : "Section"} error={err("section") && "Please enter your section."} i={3}>
                       <input value={f.section} onChange={(e) => set("section", e.target.value.toUpperCase())} maxLength={10} placeholder="e.g. A" />
                     </Field>
                     <Field label="Phone number" error={err("phone") && "Enter a valid 10-digit mobile number."} i={4}>
