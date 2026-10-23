@@ -22,6 +22,11 @@ export function Footer() {
             <li><Link className="hover:text-white" href="/radar">Scam Radar</Link></li>
             <li><Link className="hover:text-white" href="/learn">Learn &amp; practise</Link></li>
             <li><Link className="hover:text-white" href="/research">Research &amp; accuracy</Link></li>
+            <li>
+              <Link className="inline-flex items-center gap-2 font-semibold text-red hover:text-white" href="/feedback">
+                Feedback <span className="rounded-full bg-red px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wider text-white">New</span>
+              </Link>
+            </li>
           </ul>
         </div>
         <div>
