@@ -154,7 +154,7 @@ export function FeedbackExport() {
   }
 
   return (
-    <details className="fb-export group mx-auto mt-8 max-w-3xl rounded-2xl border hairline bg-white/[0.02]">
+    <details className="fb-export group mx-auto mt-8 max-w-md rounded-2xl border hairline bg-white/[0.02] text-left lg:mx-0">
       <summary className="flex list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold text-ink-soft transition-colors hover:text-white">
         <span className="flex items-center gap-2">🔐 Organisers: download responses (Excel / PDF)</span>
         <span className="transition-transform duration-300 group-open:rotate-180" aria-hidden>⌄</span>

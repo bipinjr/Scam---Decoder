@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useId, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { Confetti, DecodeText } from "./fx";
 import { FeedbackExport } from "./FeedbackExport";
+import { LogoMark } from "./Logo";
 
 type Form = {
   name: string; stream: string; class: string; section: string; phone: string;
@@ -10,54 +11,61 @@ type Form = {
 };
 const EMPTY: Form = { name: "", stream: "", class: "", section: "", phone: "", ease: 0, clarity: 0, favourite: "", recommend: "", confidence: 0, doubts: "" };
 
-const STEPS = ["About you", "Your experience", "Any doubts?"];
-const EASE = [["😵", "She'd give up"], ["😟", "Needs a lot of help"], ["😐", "Needs a little help"], ["🙂", "She'd manage"], ["🤩", "She'd teach others"]];
-const CLARITY = ["No idea", "Kind of", "Roughly", "Yes, clearly", "Like a pro"];
+const STREAMS = ["Science (PCMB)", "Science (PCMC)", "Science (PCME)", "Science (PCMS)", "Science (PCM)", "Commerce (CEBA)", "Commerce (CSBA)", "Commerce (SEBA)", "Commerce (HEBA)", "Commerce (BEBA)", "Commerce (MEBA)", "Faculty"];
+const CLASSES = ["2nd PUC", "Faculty"];
+const EASE = [["😵", "She'd give up"], ["😟", "She'd need a lot of help"], ["😐", "She'd need a little help"], ["🙂", "She'd manage"], ["🤩", "She'd teach others"]];
+const CLARITY = [["🤷", "No idea"], ["🤏", "Kind of"], ["👌", "Roughly"], ["💡", "Yes, clearly"], ["🧠", "Like a pro"]];
 const FAVOURITES = [
   ["message", "💬", "Message check"], ["voice", "📞", "Call / voice check"], ["screenshot", "🖼️", "Screenshot check"],
   ["radar", "📡", "Scam Radar"], ["practice", "🎯", "Practice mode"], ["languages", "🌐", "Indian languages"],
 ];
 const RECOMMEND = [["yes", "📲", "Sending it today"], ["maybe", "🤔", "Maybe later"], ["no", "🙅", "Nah"]];
-const CONFIDENCE = ["Panic and share it", "Call the number", "Ask someone first", "Just ignore it", "Spot it and report it"];
+const CONFIDENCE = [["😱", "Panic and share it"], ["📞", "Call the number"], ["🙋", "Ask someone first"], ["🙈", "Just ignore it"], ["🛡️", "Spot it and report it"]];
 const SUGGESTIONS = [
-  "How does it know a link is fake?", "Does it save my messages?", "Will there be an Android app?",
-  "Can it check WhatsApp voice notes?", "What if the AI gets it wrong?", "Add more Indian languages",
-  "Make a browser extension", "Can my parents use it easily?", "How do I report to cyber police?",
-  "Does it work without internet?", "Loved the red-pen markup!", "Add a scam quiz for students",
+  "How does it spot fake links?", "Does it save my messages?", "Android app?", "What if the AI is wrong?",
+  "More languages please", "Easy for my parents?",
+  "Loved the red pen!", "Add a scam quiz",
 ];
+
+// One screen per step: details, five questions, then doubts + send.
+const SCREENS = ["About you", "Question 1", "Question 2", "Question 3", "Question 4", "Question 5", "Any doubts?"];
+const ANSWER: (keyof Form | null)[] = [null, "ease", "clarity", "favourite", "recommend", "confidence", null];
 
 const isFaculty = (f: Form) => /faculty/i.test(f.class) || /faculty/i.test(f.stream);
 const phoneOk = (p: string) => /^[6-9]\d{9}$/.test(p.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""));
 
-function stepErrors(f: Form, step: number) {
+function screenErrors(f: Form, s: number) {
   const e: string[] = [];
-  if (step === 0) {
+  if (s === 0) {
     if (f.name.trim().length < 2) e.push("name");
     if (!f.stream.trim()) e.push("stream");
     if (!f.class.trim()) e.push("class");
     if (!f.section.trim() && !isFaculty(f)) e.push("section");
     if (!phoneOk(f.phone)) e.push("phone");
   }
-  if (step === 1) (["ease", "clarity", "favourite", "recommend", "confidence"] as const).forEach((k) => !f[k] && e.push(k));
+  const k = ANSWER[s];
+  if (k && !f[k]) e.push(k);
   return e;
 }
 
 export function Feedback() {
   const [f, setF] = useState<Form>(EMPTY);
-  const [step, setStep] = useState(0);
+  const [screen, setScreen] = useState(0);
   const [dir, setDir] = useState(1);
   const [errors, setErrors] = useState<string[]>([]);
   const [shake, setShake] = useState(0);
   const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
   const set = <K extends keyof Form>(k: K, v: Form[K]) => { setF((p) => ({ ...p, [k]: v })); setErrors((e) => e.filter((x) => x !== k)); };
+  const last = SCREENS.length - 1;
+  const answered = !ANSWER[screen] || !!f[ANSWER[screen]!];
 
   function go(to: number) {
-    if (to > step) {
-      const e = stepErrors(f, step);
+    if (to > screen) {
+      const e = screenErrors(f, screen);
       if (e.length) { setErrors(e); setShake((s) => s + 1); return; }
     }
-    setErrors([]); setDir(to > step ? 1 : -1); setStep(to);
-    document.getElementById("feedback-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setErrors([]); setDir(to > screen ? 1 : -1); setScreen(to);
+    document.querySelector(".fb-phone")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   async function submit() {
@@ -69,9 +77,10 @@ export function Feedback() {
   }
 
   const err = (k: string) => errors.includes(k);
+  const part = state === "done" ? 3 : screen === 0 ? 0 : screen === last ? 2 : 1;
 
   return (
-    <section id="feedback" className="relative isolate overflow-hidden pb-28 pt-6">
+    <section id="feedback" className="relative isolate overflow-clip pb-28 pt-6">
       <div className="fb-ribbon ticker relative -rotate-1 border-y border-red/40 bg-red py-3 text-night" aria-hidden>
         <div className="ticker-track fb-ribbon-track whitespace-nowrap text-lg font-extrabold uppercase tracking-[0.2em]">
           {Array.from({ length: 2 }, (_, k) => (
@@ -81,16 +90,27 @@ export function Feedback() {
           ))}
         </div>
       </div>
+
+      {/* Floating background */}
       <div className="mesh opacity-70" aria-hidden />
       <div className="grid-bg" aria-hidden />
+      <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
+        <span className="fb-orb fb-orb-a" /><span className="fb-orb fb-orb-b" /><span className="fb-orb fb-orb-c" />
+        <span className="fb-ring" style={{ left: "8%", top: "30%" } as CSSProperties} />
+        <span className="fb-ring fb-ring-2" style={{ right: "6%", top: "62%" } as CSSProperties} />
+        {Array.from({ length: 22 }, (_, i) => (
+          <span key={i} className="fb-particle" style={{ left: `${(i * 37) % 100}%`, "--d": `${(i % 7) * 1.3}s`, "--t": `${11 + (i % 5) * 3}s`, "--s": `${3 + (i % 4) * 2}px` } as CSSProperties} />
+        ))}
+      </div>
       <p className="fb-giant pointer-events-none absolute inset-x-0 top-24 select-none text-center font-black leading-none tracking-tighter" aria-hidden>FEEDBACK</p>
       {["💬", "⭐", "👍", "🛡️", "💡", "✅", "📣", "❤️"].map((e, i) => (
         <span key={e} className="fb-float pointer-events-none absolute select-none text-3xl sm:text-4xl" aria-hidden
-          style={{ left: `${[6, 88, 14, 80, 4, 92, 20, 72][i]}%`, top: `${[18, 22, 48, 52, 78, 80, 92, 90][i]}%`, "--i": i } as CSSProperties}>{e}</span>
+          style={{ left: `${[4, 90, 12, 84, 3, 93, 22, 70][i]}%`, top: `${[18, 22, 48, 50, 78, 82, 94, 92][i]}%`, "--i": i } as CSSProperties}>{e}</span>
       ))}
-      <div className="relative mx-auto mt-24 max-w-3xl px-4 sm:px-6">
-        <div className="reveal text-center">
-          <p className="fb-eyebrow mx-auto inline-flex items-center gap-2 rounded-full border border-red/40 bg-red/10 px-4 py-1.5 text-sm font-semibold text-[#ffb4ad]">
+
+      <div className="relative mx-auto mt-20 grid max-w-6xl grid-cols-1 items-center gap-12 px-4 sm:px-6 lg:grid-cols-[1fr_minmax(0,27rem)] lg:gap-16">
+        <div className="reveal text-center lg:text-left">
+          <p className="fb-eyebrow inline-flex items-center gap-2 rounded-full border border-red/40 bg-red/10 px-4 py-1.5 text-sm font-semibold text-[#ffb4ad]">
             <span className="relative flex h-2 w-2"><span className="fb-ping absolute inset-0 rounded-full bg-red" /><span className="relative h-2 w-2 rounded-full bg-red" /></span>
             Tech Anveshanam · Tech Expo Event
           </p>
@@ -106,176 +126,207 @@ export function Feedback() {
           <p className="mt-4 text-lg text-ink-soft sm:text-xl">
             for <span className="font-pen text-3xl font-bold text-red">Tech Anveshanam Tech Expo Event</span>
           </p>
-          <p className="mx-auto mt-4 max-w-xl text-ink-soft">Tried Scam Decoder? Tell us how it went. It takes about a minute.</p>
+          <p className="mx-auto mt-4 max-w-xl text-lg text-ink-soft lg:mx-0">Tried Scam Decoder? Tell us how it went. One tap per screen, about a minute.</p>
+          <ol className="mx-auto mt-8 grid max-w-md gap-3 text-left lg:mx-0">
+            {[["👤", "About you", "Name, stream, class, section"], ["🎯", "5 quick questions", "One per screen, just tap"], ["💬", "Any doubts?", "Pick a suggestion or write your own"]].map(([icon, t, d], i) => (
+              <li key={t} className={`fb-steprow flex items-center gap-4 rounded-2xl border px-4 py-3 ${i === part ? "fb-steprow-on" : "hairline"}`} style={{ "--i": i } as CSSProperties}>
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-2xl" aria-hidden>{icon}</span>
+                <span><b className="block text-lg text-white">{t}</b><span className="text-ink-soft">{d}</span></span>
+                {i < part && <span className="pop ml-auto text-xl text-green" aria-label="done">✓</span>}
+              </li>
+            ))}
+          </ol>
+          <FeedbackExport />
         </div>
 
-        <div id="feedback-card" className="card aurora fb-card reveal relative mt-12 scroll-mt-24 p-6 sm:p-10">
-          {state === "done" ? (
-            <Thanks name={f.name} onAgain={() => { setF(EMPTY); setStep(0); setState("idle"); }} />
-          ) : (
-            <>
-              <Progress step={step} onJump={(i) => i < step && go(i)} />
-
-              <div key={step} className={dir > 0 ? "fb-step-next" : "fb-step-prev"}>
-                {step === 0 && (
-                  <div className="grid gap-5 sm:grid-cols-2">
-                    <Field label="Your name" error={err("name") && "Please enter your name."} className="sm:col-span-2" i={0}>
-                      <input value={f.name} onChange={(e) => set("name", e.target.value)} maxLength={80} autoComplete="name" placeholder="e.g. Ananya Rao" />
-                    </Field>
-                    <Field label="Stream" error={err("stream") && "Please enter your stream."} i={1}>
-                      <input value={f.stream} onChange={(e) => set("stream", e.target.value)} maxLength={60} list="fb-streams" placeholder="e.g. Science (PCMC)" />
-                      <datalist id="fb-streams">{["Science (PCMB)", "Science (PCMC)", "Science (PCME)", "Science (PCMS)", "Science (PCM)", "Commerce (CEBA)", "Commerce (CSBA)", "Commerce (SEBA)", "Commerce (HEBA)", "Commerce (BEBA)", "Commerce (MEBA)", "Faculty"].map((s) => <option key={s} value={s} />)}</datalist>
-                    </Field>
-                    <Field label="Class" error={err("class") && "Please enter your class."} i={2}>
-                      <input value={f.class} onChange={(e) => set("class", e.target.value)} maxLength={30} list="fb-classes" placeholder="e.g. 2nd PUC" />
-                      <datalist id="fb-classes">{["2nd PUC", "Faculty"].map((s) => <option key={s} value={s} />)}</datalist>
-                    </Field>
-                    <Field label={isFaculty(f) ? "Section (optional for faculty)" : "Section"} error={err("section") && "Please enter your section."} i={3}>
-                      <input value={f.section} onChange={(e) => set("section", e.target.value.toUpperCase())} maxLength={10} placeholder="e.g. A" />
-                    </Field>
-                    <Field label="Phone number" error={err("phone") && "Enter a valid 10-digit mobile number."} i={4}>
-                      <input value={f.phone} onChange={(e) => set("phone", e.target.value.replace(/[^\d+ ]/g, ""))} maxLength={16} type="tel" inputMode="numeric" autoComplete="tel" placeholder="10-digit mobile" />
-                    </Field>
-                    <p className="text-sm text-ink-soft sm:col-span-2">🔒 Your details are used only for this event&apos;s feedback and are never shown publicly.</p>
-                  </div>
-                )}
-
-                {step === 1 && (
-                  <div className="space-y-6">
-                    <Question n={1} title="If your grandma tried Scam Decoder on her own, how would it go?" error={err("ease")}>
-                      <div className="grid grid-cols-5 gap-2">
-                        {EASE.map(([emoji, label], i) => (
-                          <Option key={label} name="ease" checked={f.ease === i + 1} onChange={() => set("ease", i + 1)} className="fb-emoji flex-col py-3">
-                            <span className="text-3xl sm:text-4xl" aria-hidden>{emoji}</span>
-                            <span className="mt-1 text-[0.7rem] leading-tight sm:text-xs">{label}</span>
-                          </Option>
-                        ))}
-                      </div>
-                    </Question>
-
-                    <Question n={2} title="Could you now explain to a friend WHY that message was a scam?" error={err("clarity")}>
-                      <div className="grid grid-cols-5 gap-2">
-                        {CLARITY.map((label, i) => (
-                          <Option key={label} name="clarity" checked={f.clarity === i + 1} onChange={() => set("clarity", i + 1)} className="flex-col py-3">
-                            <span className="font-pen text-3xl font-bold leading-none">{i + 1}</span>
-                            <span className="mt-1 text-[0.7rem] leading-tight sm:text-xs">{label}</span>
-                          </Option>
-                        ))}
-                      </div>
-                    </Question>
-
-                    <Question n={3} title="Which feature would you show your family first?" error={err("favourite")}>
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        {FAVOURITES.map(([id, icon, label]) => (
-                          <Option key={id} name="favourite" checked={f.favourite === id} onChange={() => set("favourite", id)} className="justify-start gap-2 px-3 py-3 text-left">
-                            <span className="fb-icon text-xl" aria-hidden>{icon}</span><span className="text-sm font-semibold">{label}</span>
-                          </Option>
-                        ))}
-                      </div>
-                    </Question>
-
-                    <Question n={4} title="Would you drop Scam Decoder in your family WhatsApp group?" error={err("recommend")}>
-                      <div className="grid grid-cols-3 gap-2">
-                        {RECOMMEND.map(([id, icon, label]) => (
-                          <Option key={id} name="recommend" checked={f.recommend === id} onChange={() => set("recommend", id)} className="fb-emoji flex-col py-4">
-                            <span className="text-3xl" aria-hidden>{icon}</span><span className="mt-1 text-xs font-semibold sm:text-sm">{label}</span>
-                          </Option>
-                        ))}
-                      </div>
-                    </Question>
-
-                    <Question n={5} title="Tomorrow you get: “Your bank account will be blocked today. Share the OTP to stop it.” What do you do?" error={err("confidence")}>
-                      <div className="flex h-44 items-end gap-2" role="presentation">
-                        {CONFIDENCE.map((label, i) => (
-                          <Option key={label} name="confidence" checked={f.confidence === i + 1} onChange={() => set("confidence", i + 1)}
-                            className={`fb-meter flex-1 flex-col justify-end pb-2 ${f.confidence === i + 1 ? "fb-meter-on" : ""}`} style={{ height: `${36 + i * 16}%`, "--i": i } as CSSProperties}>
-                            <span className="text-[0.65rem] font-semibold leading-tight sm:text-xs">{label}</span>
-                          </Option>
-                        ))}
-                      </div>
-                    </Question>
-                  </div>
-                )}
-
-                {step === 2 && (
-                  <div className="space-y-6">
-                    <Field label="Any doubts, questions or suggestions? (optional)" i={0}>
-                      <textarea value={f.doubts} onChange={(e) => set("doubts", e.target.value)} maxLength={1000} rows={5} placeholder="Ask us anything about Scam Decoder, or tell us what to improve…" />
-                    </Field>
-                    <p className="-mt-4 text-right text-xs text-ink-soft tabular-nums">{f.doubts.length} / 1000</p>
-                    <div>
-                      <p className="text-sm font-semibold text-white">💡 Tap to add, no typing needed</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {SUGGESTIONS.map((sg, i) => {
-                          const used = f.doubts.includes(sg);
-                          return (
-                            <button key={sg} type="button" aria-pressed={used}
-                              onClick={() => set("doubts", used ? f.doubts.replace(sg, "").replace(/\n{2,}/g, "\n").trim() : (f.doubts.trim() ? f.doubts.trim() + "\n" : "") + sg)}
-                              className={`fb-sugg rounded-full border px-3.5 py-2 text-sm ${used ? "fb-sugg-on" : ""}`} style={{ "--i": i } as CSSProperties}>
-                              {used ? "✓ " : "+ "}{sg}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="fb-summary rounded-2xl border hairline bg-white/[0.03] p-5">
-                      <p className="text-sm font-semibold text-white">Quick review</p>
-                      <ul className="mt-3 flex flex-wrap gap-2 text-sm">
-                        {[
-                          f.name, `${f.stream} · ${f.class} · ${f.section}`,
-                          `Grandma test ${EASE[f.ease - 1]?.[0] ?? ""}`, `Can explain: ${CLARITY[f.clarity - 1] ?? ""}`,
-                          `Show first: ${FAVOURITES.find((x) => x[0] === f.favourite)?.[2] ?? ""}`,
-                          `Family group: ${RECOMMEND.find((x) => x[0] === f.recommend)?.[2] ?? ""}`,
-                          `You would: ${CONFIDENCE[f.confidence - 1] ?? ""}`,
-                        ].map((s, i) => <li key={i} className="fb-tag rounded-full border border-white/12 bg-white/[0.05] px-3 py-1 text-ink" style={{ "--i": i } as CSSProperties}>{s}</li>)}
-                      </ul>
-                    </div>
-                  </div>
-                )}
+        {/* The phone: fixed height, one screen at a time */}
+        <div className="phone-in mx-auto w-full max-w-[27rem]">
+          <div className="phone aurora fb-phone">
+            <div id="feedback-card" className="phone-screen fb-card relative"
+              onPointerMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`); e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`); }}>
+              <div className="fb-spot" aria-hidden />
+              <div className="phone-notch" aria-hidden />
+              <div className="flex items-center gap-3 border-b hairline bg-white/[0.03] px-5 pb-3 pt-2">
+                <span className="grid h-11 w-11 place-items-center rounded-full bg-white/[0.08]" aria-hidden><LogoMark size={28} /></span>
+                <div className="leading-tight">
+                  <p className="text-lg font-semibold text-white">Scam Decoder</p>
+                  <p className="text-ink-soft">{state === "done" ? "Feedback sent" : SCREENS[screen]}</p>
+                </div>
+                <span key={state === "done" ? "done" : screen} className={`pop ml-auto rounded-full px-3 py-1 font-bold ${state === "done" ? "bg-green-wash text-green" : "bg-red-wash text-[#ff8a80]"}`}>
+                  {state === "done" ? "Sent ✓" : `${screen + 1} / ${SCREENS.length}`}
+                </span>
               </div>
 
-              <div aria-live="polite" className="min-h-6">
-                {errors.length > 0 && <p key={shake} className="shake mt-5 text-sm font-semibold text-[#ff8a80]">{step === 0 ? "Please fill in the highlighted details" : "Please answer the highlighted questions"} to continue.</p>}
-                {state === "error" && <p className="shake mt-5 text-sm font-semibold text-[#ff8a80]">Couldn&apos;t send your feedback. Check your connection and try again.</p>}
+              {/* Story-style progress */}
+              <div className="flex gap-1.5 px-5 pt-3" aria-hidden>
+                {SCREENS.map((s, i) => (
+                  <span key={s} className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.1]">
+                    <span className={`fb-seg block h-full rounded-full bg-red ${state === "done" || i < screen ? "fb-seg-full" : i === screen ? "fb-seg-now" : ""}`} />
+                  </span>
+                ))}
               </div>
 
-              <div className="mt-6 flex items-center justify-between gap-3">
-                {step > 0 ? <button type="button" onClick={() => go(step - 1)} className="btn-ghost rounded-xl px-5 py-3">← Back</button> : <span />}
-                {step < 2 ? (
-                  <button type="button" onClick={() => go(step + 1)} className="btn-primary fb-next rounded-xl px-6 py-3 text-lg">Next →</button>
+              <div className="chat-wall flex h-[33rem] flex-col">
+                {state === "done" ? (
+                  <Thanks name={f.name} onAgain={() => { setF(EMPTY); setScreen(0); setState("idle"); }} />
                 ) : (
-                  <button type="button" onClick={submit} disabled={state === "sending"} className="btn-primary fb-next rounded-xl px-6 py-3 text-lg disabled:opacity-70">
-                    {state === "sending" ? <span className="inline-flex items-center gap-2"><span className="fb-spin h-4 w-4 rounded-full border-2 border-white/40 border-t-white" />Sending…</span> : "Send feedback ✓"}
-                  </button>
+                  <>
+                    <div key={screen} className={`fb-scroll flex-1 overflow-y-auto px-5 pb-2 pt-4 ${dir > 0 ? "fb-step-next" : "fb-step-prev"}`}>
+                      {screen === 0 && (
+                        <div className="grid gap-2.5">
+                          <Field label="Your name" error={err("name") && "Please enter your name."} i={0}>
+                            <input value={f.name} onChange={(e) => set("name", e.target.value)} maxLength={80} autoComplete="name" placeholder="e.g. Ananya Rao" />
+                          </Field>
+                          <Field label="Stream" error={err("stream") && "Please pick your stream."} i={1}>
+                            <Combo id="fb-stream" value={f.stream} onChange={(v) => set("stream", v)} maxLength={60} options={STREAMS} placeholder="e.g. Science (PCMC)" />
+                          </Field>
+                          <div className="grid grid-cols-2 gap-3">
+                            <Field label="Class" error={err("class") && "Pick your class."} i={2}>
+                              <Combo id="fb-class" value={f.class} onChange={(v) => set("class", v)} maxLength={30} options={CLASSES} placeholder="2nd PUC" />
+                            </Field>
+                            <Field label={isFaculty(f) ? "Section (optional)" : "Section"} error={err("section") && "Enter section."} i={3}>
+                              <input value={f.section} onChange={(e) => set("section", e.target.value.toUpperCase())} maxLength={10} placeholder="e.g. A" />
+                            </Field>
+                          </div>
+                          <Field label="Phone number" error={err("phone") && "Enter a valid 10-digit mobile number."} i={4}>
+                            <input value={f.phone} onChange={(e) => set("phone", e.target.value.replace(/[^\d+ ]/g, ""))} maxLength={16} type="tel" inputMode="numeric" autoComplete="tel" placeholder="10-digit mobile" />
+                          </Field>
+                          <p className="text-sm text-ink-soft">🔒 Used only for this event&apos;s feedback, never shown publicly.</p>
+                        </div>
+                      )}
+
+                      {screen === 1 && (
+                        <Question n={1} title="If your grandma tried Scam Decoder on her own, how would it go?" error={err("ease")}>
+                          {EASE.map(([emoji, label], i) => (
+                            <Option key={label} name="ease" checked={f.ease === i + 1} onChange={() => set("ease", i + 1)} i={i}><Row emoji={emoji} label={label} /></Option>
+                          ))}
+                        </Question>
+                      )}
+
+                      {screen === 2 && (
+                        <Question n={2} title="Could you now explain to a friend WHY that message was a scam?" error={err("clarity")}>
+                          {CLARITY.map(([emoji, label], i) => (
+                            <Option key={label} name="clarity" checked={f.clarity === i + 1} onChange={() => set("clarity", i + 1)} i={i}><Row emoji={emoji} label={label} level={i} /></Option>
+                          ))}
+                        </Question>
+                      )}
+
+                      {screen === 3 && (
+                        <Question n={3} title="Which feature would you show your family first?" error={err("favourite")} cols={2}>
+                          {FAVOURITES.map(([id, icon, label], i) => (
+                            <Option key={id} name="favourite" checked={f.favourite === id} onChange={() => set("favourite", id)} i={i}><Row emoji={icon} label={label} compact /></Option>
+                          ))}
+                        </Question>
+                      )}
+
+                      {screen === 4 && (
+                        <Question n={4} title="Would you drop Scam Decoder in your family WhatsApp group?" error={err("recommend")}>
+                          {RECOMMEND.map(([id, icon, label], i) => (
+                            <Option key={id} name="recommend" checked={f.recommend === id} onChange={() => set("recommend", id)} i={i}><Row emoji={icon} label={label} /></Option>
+                          ))}
+                        </Question>
+                      )}
+
+                      {screen === 5 && (
+                        <Question n={5} title="An SMS says: “Account blocked today, share OTP.” What do you do?" error={err("confidence")}>
+                          {CONFIDENCE.map(([emoji, label], i) => (
+                            <Option key={label} name="confidence" checked={f.confidence === i + 1} onChange={() => set("confidence", i + 1)} i={i}><Row emoji={emoji} label={label} level={i} /></Option>
+                          ))}
+                        </Question>
+                      )}
+
+                      {screen === 6 && (
+                        <div className="space-y-3">
+                          <Field label="Any doubts, questions or suggestions? (optional)" i={0}>
+                            <textarea value={f.doubts} onChange={(e) => set("doubts", e.target.value)} maxLength={1000} rows={2} placeholder="Type here, or tap a suggestion below…" />
+                          </Field>
+                          <div>
+                            <p className="text-sm font-semibold text-white">💡 Tap to add, no typing needed</p>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {SUGGESTIONS.map((sg, i) => {
+                                const used = f.doubts.includes(sg);
+                                return (
+                                  <button key={sg} type="button" aria-pressed={used}
+                                    onClick={() => set("doubts", used ? f.doubts.replace(sg, "").replace(/\n{2,}/g, "\n").trim() : (f.doubts.trim() ? f.doubts.trim() + "\n" : "") + sg)}
+                                    className={`fb-sugg rounded-full border px-3 py-1.5 text-sm ${used ? "fb-sugg-on" : ""}`} style={{ "--i": i } as CSSProperties}>
+                                    {used ? "✓ " : "+ "}{sg}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border-t hairline bg-[#0a1120]/90 px-5 pb-4 pt-2">
+                      <div aria-live="polite" className="min-h-5">
+                        {errors.length > 0 && <p key={shake} className="shake mb-2 text-sm font-semibold text-[#ff8a80]">{screen === 0 ? "Fill in the highlighted details to continue." : "Pick an answer to continue."}</p>}
+                        {state === "error" && <p className="shake mb-2 text-sm font-semibold text-[#ff8a80]">Couldn&apos;t send. Check your connection and try again.</p>}
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        {screen > 0 ? <button type="button" onClick={() => go(screen - 1)} className="btn-ghost rounded-xl px-5 py-3">← Back</button> : <span />}
+                        {screen < last ? (
+                          <button type="button" onClick={() => go(screen + 1)} className={`btn-primary fb-next rounded-xl px-7 py-3 text-lg ${answered && screen > 0 ? "fb-next-ready" : ""}`}>Next →</button>
+                        ) : (
+                          <button type="button" onClick={submit} disabled={state === "sending"} className="btn-primary fb-next fb-next-ready rounded-xl px-6 py-3 text-lg disabled:opacity-70">
+                            {state === "sending" ? <span className="inline-flex items-center gap-2"><span className="fb-spin h-4 w-4 rounded-full border-2 border-white/40 border-t-white" />Sending…</span> : "Send feedback ✓"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
-            </>
-          )}
+            </div>
+          </div>
         </div>
-        <FeedbackExport />
       </div>
     </section>
   );
 }
 
-function Progress({ step, onJump }: { step: number; onJump: (i: number) => void }) {
+// Themed type-ahead dropdown (native <datalist> popups can't be styled).
+function Combo({ id, value, onChange, options, placeholder, maxLength }: { id: string; value: string; onChange: (v: string) => void; options: string[]; placeholder: string; maxLength: number }) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const input = useRef<HTMLInputElement>(null);
+  const listId = useId();
+  const q = value.trim().toLowerCase();
+  const shown = !q || options.some((o) => o.toLowerCase() === q) ? options : options.filter((o) => o.toLowerCase().includes(q));
+  const pick = (o: string) => { onChange(o); setOpen(false); };
+  function onKey(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!open) { setOpen(true); return; }
+      setActive((a) => (a + (e.key === "ArrowDown" ? 1 : -1) + shown.length) % Math.max(shown.length, 1));
+    } else if (e.key === "Enter" && open && shown[active]) { e.preventDefault(); pick(shown[active]); }
+    else if (e.key === "Escape") setOpen(false);
+  }
   return (
-    <div className="mb-8">
-      <div className="flex justify-between gap-2">
-        {STEPS.map((s, i) => (
-          <button key={s} type="button" onClick={() => onJump(i)} disabled={i >= step} aria-current={i === step ? "step" : undefined}
-            className={`flex items-center gap-2 text-sm font-semibold transition-colors disabled:cursor-default ${i <= step ? "text-white" : "text-ink-soft"}`}>
-            <span className={`fb-dot grid h-7 w-7 place-items-center rounded-full border-2 text-xs ${i < step ? "border-green bg-green text-night" : i === step ? "fb-dot-on border-red text-white" : "border-white/20"}`}>
-              {i < step ? "✓" : i + 1}
-            </span>
-            <span className="hidden sm:inline">{s}</span>
-          </button>
-        ))}
-      </div>
-      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
-        <div className="fb-bar h-full rounded-full bg-gradient-to-r from-red to-[#ff8a5c]" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
-      </div>
-      <p className="mt-3 text-xs text-ink-soft sm:hidden">Step {step + 1} of 3 · {STEPS[step]}</p>
+    <div className="relative">
+      <input ref={input} id={id} value={value} maxLength={maxLength} placeholder={placeholder} autoComplete="off"
+        role="combobox" aria-expanded={open} aria-controls={listId} aria-autocomplete="list"
+        aria-activedescendant={open && shown[active] ? `${listId}-${active}` : undefined}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); setActive(0); }}
+        onFocus={() => { setOpen(true); setActive(0); }} onBlur={() => setOpen(false)} onKeyDown={onKey} className="pr-11" />
+      <button type="button" tabIndex={-1} aria-hidden onMouseDown={(e) => { e.preventDefault(); setOpen(!open); input.current?.focus(); }}
+        className={`absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-ink-soft transition-transform duration-300 hover:text-white ${open ? "rotate-180 text-red" : ""}`}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      {open && shown.length > 0 && (
+        <ul id={listId} role="listbox" className="fb-menu absolute inset-x-0 top-full z-40 mt-2 max-h-60 overflow-auto rounded-2xl border border-white/10 p-1.5">
+          {shown.map((o, i) => (
+            <li key={o} id={`${listId}-${i}`} role="option" aria-selected={o === value}
+              onMouseDown={(e) => { e.preventDefault(); pick(o); }} onMouseEnter={() => setActive(i)}
+              className={`fb-menu-item flex cursor-pointer items-center justify-between rounded-xl px-3.5 py-2.5 text-[0.95rem] ${i === active ? "fb-menu-active" : ""} ${o === value ? "font-semibold text-white" : "text-ink"}`}
+              style={{ "--i": i } as CSSProperties}>
+              <span>{o.replace(/ \(.*\)$/, "")}{o.includes("(") && <span className="ml-2 rounded-md bg-white/[0.07] px-1.5 py-0.5 font-mono text-xs text-[#ffb4ad]">{o.match(/\((.*)\)/)?.[1]}</span>}</span>
+              {o === value && <span className="text-red" aria-hidden>✓</span>}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -283,29 +334,43 @@ function Progress({ step, onJump }: { step: number; onJump: (i: number) => void 
 function Field({ label, error, className = "", i, children }: { label: string; error?: string | false; className?: string; i: number; children: ReactNode }) {
   return (
     <label className={`fb-field block ${error ? "fb-invalid" : ""} ${className}`} style={{ "--i": i } as CSSProperties}>
-      <span className="mb-2 block text-sm font-semibold text-ink">{label}</span>
+      <span className="mb-1 block text-sm font-semibold text-ink">{label}</span>
       <span className="fb-input relative block">{children}<span className="fb-ink" aria-hidden /></span>
       {error && <span className="pop mt-1.5 block text-xs font-semibold text-[#ff8a80]">{error}</span>}
     </label>
   );
 }
 
-function Question({ n, title, error, children }: { n: number; title: string; error: boolean; children: ReactNode }) {
+function Question({ n, title, error, cols = 1, children }: { n: number; title: string; error: boolean; cols?: number; children: ReactNode }) {
   return (
-    <fieldset className={`fb-q rounded-2xl border p-4 sm:p-5 ${error ? "fb-invalid border-red/60 bg-red/[0.06]" : "hairline bg-white/[0.02]"}`} style={{ "--i": n - 1 } as CSSProperties}>
+    <fieldset className={error ? "fb-invalid" : ""}>
       <legend className="sr-only">{title}</legend>
-      <p className="mb-4 flex items-start gap-3 font-semibold text-white" aria-hidden>
-        <span className="font-pen text-2xl leading-none text-red">Q{n}</span><span>{title}</span>
+      <p className="fb-qtitle mb-4 text-[1.15rem] font-semibold leading-snug text-white" aria-hidden>
+        <span className="fb-qnum mb-1 block font-pen text-3xl leading-none text-red">Q{n}</span>{title}
       </p>
-      {children}
-      {error && <p className="pop mt-2 text-xs font-semibold text-[#ff8a80]">Please pick an answer.</p>}
+      <div className={`grid gap-1.5 ${cols === 2 ? "grid-cols-2" : ""}`}>{children}</div>
     </fieldset>
   );
 }
 
-function Option({ name, checked, onChange, className = "", style, children }: { name: string; checked: boolean; onChange: () => void; className?: string; style?: CSSProperties; children: ReactNode }) {
+function Row({ emoji, label, level, compact }: { emoji: string; label: string; level?: number; compact?: boolean }) {
   return (
-    <label className={`fb-opt flex items-center justify-center rounded-xl border text-center ${checked ? "fb-opt-on" : ""} ${className}`} style={style}>
+    <>
+      <span className="fb-icon grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-xl" aria-hidden>{emoji}</span>
+      <span className={`flex-1 text-left font-semibold leading-snug ${compact ? "text-[0.92rem]" : "text-[1.02rem]"}`}>{label}</span>
+      {level !== undefined && (
+        <span className="flex shrink-0 gap-1" aria-hidden>
+          {Array.from({ length: 5 }, (_, k) => <span key={k} className={`fb-pip h-2 w-2 rounded-full ${k <= level ? "fb-pip-on" : ""}`} style={{ "--k": k } as CSSProperties} />)}
+        </span>
+      )}
+      {!compact && <span className="fb-radio grid h-6 w-6 shrink-0 place-items-center rounded-full border-2" aria-hidden><span className="fb-radio-dot h-2.5 w-2.5 rounded-full" /></span>}
+    </>
+  );
+}
+
+function Option({ name, checked, onChange, i, children }: { name: string; checked: boolean; onChange: () => void; i: number; children: ReactNode }) {
+  return (
+    <label className={`fb-opt fb-row flex items-center gap-3 rounded-2xl border px-3 py-2 ${checked ? "fb-opt-on" : ""}`} style={{ "--i": i } as CSSProperties}>
       <input type="radio" name={name} checked={checked} onChange={onChange} className="sr-only" />
       {children}
     </label>
@@ -314,14 +379,17 @@ function Option({ name, checked, onChange, className = "", style, children }: { 
 
 function Thanks({ name, onAgain }: { name: string; onAgain: () => void }) {
   return (
-    <div className="py-10 text-center" role="status">
+    <div className="flex flex-1 flex-col items-center justify-center px-6 text-center" role="status">
       <Confetti count={70} />
-      <div className="stamp pop mx-auto inline-block px-6 py-3 font-mono text-3xl font-bold text-green sm:text-4xl">THANK YOU</div>
-      <h3 className="fb-rise mt-8 text-2xl font-semibold text-white sm:text-3xl" style={{ "--i": 1 } as CSSProperties}>
+      <div className="relative inline-block">
+        <span className="fb-burst" aria-hidden /><span className="fb-burst" style={{ animationDelay: ".35s" }} aria-hidden />
+        <div className="stamp pop relative inline-block px-6 py-3 font-mono text-3xl font-bold text-green">THANK YOU</div>
+      </div>
+      <h3 className="fb-rise mt-8 text-2xl font-semibold text-white" style={{ "--i": 1 } as CSSProperties}>
         Thanks{name.trim() ? `, ${name.trim().split(" ")[0]}` : ""}! Your feedback is in.
       </h3>
-      <p className="fb-rise mx-auto mt-3 max-w-md text-ink-soft" style={{ "--i": 2 } as CSSProperties}>
-        It helps Team BRAINSTORM make Scam Decoder better. Stay alert: never share an OTP, and call <b className="text-white">1930</b> if you lose money to a scam.
+      <p className="fb-rise mt-3 text-ink-soft" style={{ "--i": 2 } as CSSProperties}>
+        It helps Team BRAINSTORM make Scam Decoder better. Never share an OTP, and call <b className="text-white">1930</b> if you lose money to a scam.
       </p>
       <button type="button" onClick={onAgain} className="btn-ghost fb-rise mt-8 rounded-xl px-5 py-3" style={{ "--i": 3 } as CSSProperties}>Submit another response</button>
     </div>
