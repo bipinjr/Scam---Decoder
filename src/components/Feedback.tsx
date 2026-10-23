@@ -122,16 +122,15 @@ export function Feedback() {
                       <input value={f.name} onChange={(e) => set("name", e.target.value)} maxLength={80} autoComplete="name" placeholder="e.g. Ananya Rao" />
                     </Field>
                     <Field label="Stream" error={err("stream") && "Please enter your stream."} i={1}>
-                      <input value={f.stream} onChange={(e) => set("stream", e.target.value)} maxLength={60} list="fb-streams" placeholder="e.g. BCA" />
-                      <datalist id="fb-streams">{["BCA", "BCom", "BSc", "BBA", "BA", "BE / BTech", "MCA", "MBA", "PUC", "Diploma"].map((s) => <option key={s} value={s} />)}</datalist>
+                      <input value={f.stream} onChange={(e) => set("stream", e.target.value)} maxLength={60} list="fb-streams" placeholder="e.g. Science (PCMB)" />
+                      <datalist id="fb-streams">{["Science (PCMB)", "Science (PCMC)", "Science (PCME)", "Commerce", "Arts"].map((s) => <option key={s} value={s} />)}</datalist>
                     </Field>
-                    <Field label="Class / Year" error={err("class") && "Please enter your class."} i={2}>
-                      <input value={f.class} onChange={(e) => set("class", e.target.value)} maxLength={30} list="fb-classes" placeholder="e.g. 2nd Year" />
-                      <datalist id="fb-classes">{["1st Year", "2nd Year", "3rd Year", "4th Year", "1st PUC", "2nd PUC", "Faculty", "Visitor"].map((s) => <option key={s} value={s} />)}</datalist>
+                    <Field label="Class" error={err("class") && "Please enter your class."} i={2}>
+                      <input value={f.class} onChange={(e) => set("class", e.target.value)} maxLength={30} list="fb-classes" placeholder="e.g. 1st PUC" />
+                      <datalist id="fb-classes">{["1st PUC", "2nd PUC"].map((s) => <option key={s} value={s} />)}</datalist>
                     </Field>
                     <Field label="Section" error={err("section") && "Please enter your section."} i={3}>
-                      <input value={f.section} onChange={(e) => set("section", e.target.value.toUpperCase())} maxLength={10} list="fb-sections" placeholder="e.g. A" />
-                      <datalist id="fb-sections">{["A", "B", "C", "D", "E", "F"].map((s) => <option key={s} value={s} />)}</datalist>
+                      <input value={f.section} onChange={(e) => set("section", e.target.value.toUpperCase())} maxLength={10} placeholder="e.g. A" />
                     </Field>
                     <Field label="Phone number" error={err("phone") && "Enter a valid 10-digit mobile number."} i={4}>
                       <input value={f.phone} onChange={(e) => set("phone", e.target.value.replace(/[^\d+ ]/g, ""))} maxLength={16} type="tel" inputMode="numeric" autoComplete="tel" placeholder="10-digit mobile" />
